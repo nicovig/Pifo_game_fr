@@ -64,7 +64,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 <Layout pageTitle="PIFO France - Classement des villes">
 	<main class="app">
-		<h1 class="site-title">PIFO France</h1>
+		<h1 class="site-title">PIFO <span class="site-title-badge">FRANCE</span></h1>
 		<section class="right-panel">
 			<div id="map"></div>
 		</section>
@@ -74,7 +74,12 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 			<div class="card controls-card">
 				<div class="controls-grid">
 					<div class="control-group search-group">
-						<label for="search-query">Recherche ville ou departement</label>
+						<div class="search-label-row">
+							<label for="search-query">Recherche ville ou departement</label>
+							<button id="sources-info-button" class="info-bubble" type="button" aria-label="Afficher les sources">
+								i
+							</button>
+						</div>
 						<input id="search-query" type="text" placeholder="Ex: Nantes, Martinique, 972" />
 					</div>
 
@@ -82,7 +87,8 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						<div class="control-group">
 							<label for="sort-criterion">Critere</label>
 							<select id="sort-criterion">
-								<option value="departmentNumber">Departement</option>
+								<option value="name">Alphabetique</option>
+								<option value="departmentNumber" selected>Departement</option>
 								<option value="population">Population</option>
 								<option value="latitude">Latitude</option>
 								<option value="longitude">Longitude</option>
@@ -95,14 +101,14 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						<div class="control-group">
 							<label for="sort-order">Ordre</label>
 							<select id="sort-order">
+								<option value="asc" selected>Moins au plus</option>
 								<option value="desc">Plus au moins</option>
-								<option value="asc">Moins au plus</option>
 							</select>
 						</div>
 					</div>
 
 					<div class="control-group">
-						<label for="scope-mode">Mode</label>
+						<label for="scope-mode">Villes a afficher</label>
 						<select id="scope-mode">
 							<option value="all">Toutes les villes</option>
 							<option value="selected">Selectionnees</option>
@@ -110,8 +116,20 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 					</div>
 				</div>
 				<div class="actions-row">
-					<button id="clear-selection" class="action-button tertiary" type="button">Vider</button>
-					<button id="fit-selection" class="action-button" type="button">Cadrer</button>
+					<button id="clear-selection" class="action-button tertiary" type="button">Vider la sélection</button>
+					<button id="fit-selection" class="action-button" type="button">Cadrer sur la carte</button>
+				</div>
+			</div>
+
+			<div id="sources-modal" class="sources-modal" hidden>
+				<div class="sources-modal-card">
+					<h2>Sources des donnees</h2>
+					<ul class="sources-list">
+						<li>Immobilier: donnees 2026</li>
+						<li>Pluviometrie: donnees 2025</li>
+						<li>Population: donnees 2024</li>
+					</ul>
+					<button id="sources-close-button" class="action-button" type="button">Fermer</button>
 				</div>
 			</div>
 		</section>
@@ -138,14 +156,17 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		const scopeElement = document.getElementById('scope-mode');
 		const searchElement = document.getElementById('search-query');
 		const cityListElement = document.getElementById('city-list');
+		const mapSectionElement = document.querySelector('.right-panel');
 		const resultCountElement = document.getElementById('result-count');
 		const selectionCountElement = document.getElementById('selection-count');
 		const clearSelectionButton = document.getElementById('clear-selection');
 		const fitSelectionButton = document.getElementById('fit-selection');
+		const sourcesInfoButton = document.getElementById('sources-info-button');
+		const sourcesCloseButton = document.getElementById('sources-close-button');
+		const sourcesModal = document.getElementById('sources-modal');
 		const cities = JSON.parse(cityDataElement?.textContent ?? '[]');
 		const map = L.map('map', { zoomControl: true, worldCopyJump: true });
 		const selectedCityIds = new Set();
-		const expandedCityIds = new Set();
 
 		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 			maxZoom: 19,
@@ -215,14 +236,6 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 			updateMarkerStyles();
 		};
 
-		const toggleExpanded = (cityId) => {
-			if (expandedCityIds.has(cityId)) {
-				expandedCityIds.delete(cityId);
-			} else {
-				expandedCityIds.add(cityId);
-			}
-		};
-
 		const normalizeText = (value) =>
 			value
 				.toLowerCase()
@@ -278,12 +291,15 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		};
 
 		const render = () => {
-			const criterion = criterionElement?.value ?? 'population';
-			const order = orderElement?.value ?? 'desc';
+			const criterion = criterionElement?.value ?? 'departmentNumber';
+			const order = orderElement?.value ?? 'asc';
 			const direction = order === 'asc' ? 1 : -1;
 			const sourceCities = getCitiesToDisplay();
 
 			const sortedCities = [...sourceCities].sort((a, b) => {
+				if (criterion === 'name') {
+					return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }) * direction;
+				}
 				const first = a[criterion];
 				const second = b[criterion];
 				if (first > second) return direction;
@@ -308,10 +324,6 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				if (selectedCityIds.has(city.id)) {
 					item.classList.add('is-selected');
 				}
-				const isExpanded = expandedCityIds.has(city.id);
-				if (isExpanded) {
-					item.classList.add('is-expanded');
-				}
 				item.dataset.cityId = city.id;
 
 				const rank = document.createElement('button');
@@ -330,22 +342,10 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				const topRow = document.createElement('div');
 				topRow.className = 'city-top-row';
 
-				const title = document.createElement('button');
-				title.type = 'button';
+				const title = document.createElement('span');
 				title.className = 'city-title';
 				title.textContent = city.name;
-
-				const expandButton = document.createElement('button');
-				expandButton.type = 'button';
-				expandButton.className = 'expand-button';
-				expandButton.textContent = isExpanded ? 'Masquer' : 'Details';
-				expandButton.addEventListener('click', (event) => {
-					event.stopPropagation();
-					toggleExpanded(city.id);
-					render();
-				});
-
-				topRow.append(title, expandButton);
+				topRow.append(title);
 
 				const selectionToggle = document.createElement('button');
 				selectionToggle.type = 'button';
@@ -367,9 +367,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 					createDetailLine('Pluviometrie', `${city.rainfallMm} mm`),
 					createDetailLine('Prix m2', `${city.pricePerSquareMeter} EUR/m2`)				
 				);
-				if (!isExpanded) {
-					details.hidden = true;
-				}
+
 
 				const actions = document.createElement('div');
 				actions.className = 'city-actions';
@@ -379,8 +377,9 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				item.append(rank, content);
 
 				item.addEventListener('click', () => {
-					toggleExpanded(city.id);
+					toggleSelection(city.id);
 					render();
+					mapSectionElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 					const marker = markersById.get(city.id);
 					if (!marker) return;
 					map.flyTo(marker.getLatLng(), Math.max(map.getZoom(), 7), { duration: 0.6 });
@@ -397,6 +396,17 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		orderElement?.addEventListener('change', render);
 		scopeElement?.addEventListener('change', render);
 		searchElement?.addEventListener('input', render);
+		sourcesInfoButton?.addEventListener('click', () => {
+			sourcesModal?.removeAttribute('hidden');
+		});
+		sourcesCloseButton?.addEventListener('click', () => {
+			sourcesModal?.setAttribute('hidden', '');
+		});
+		sourcesModal?.addEventListener('click', (event) => {
+			if (event.target === sourcesModal) {
+				sourcesModal.setAttribute('hidden', '');
+			}
+		});
 		clearSelectionButton?.addEventListener('click', () => {
 			selectedCityIds.clear();
 			updateMarkerStyles();
@@ -419,7 +429,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	:global(html),
 	:global(body) {
-		background: linear-gradient(160deg, #ebe3d6 0%, #f7efe0 100%);
+		background: #ffffff;
 		color: var(--pifo-ink);
 		font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	}
@@ -436,9 +446,24 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	.site-title {
 		margin: 0;
-		font-weight: 700;
-		letter-spacing: 0.2px;
-		color: #1f4f77;
+		text-align: center;
+		font-size: 1.3rem;
+		font-weight: 900;
+		letter-spacing: 1px;
+		text-transform: uppercase;
+		color: #1a4f86;
+		font-family: Impact, Haettenschweiler, 'Arial Black', sans-serif;
+	}
+
+	.site-title-badge {
+		display: inline-block;
+		margin-left: 0.25rem;
+		padding: 0.02rem 0.35rem;
+		border-radius: 7px;
+		background: #e23b4a;
+		color: #ffffff;
+		font-size: 0.68em;
+		letter-spacing: 0.5px;
 	}
 
 	.filters-panel {
@@ -450,14 +475,14 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	.card {
 		border-radius: 16px;
-		background: #fff;
+		background: #eef6ff;
 		border: 2px solid rgba(31, 79, 119, 0.2);
 		box-shadow: 0 8px 22px rgba(31, 79, 119, 0.12);
 		padding: 0.72rem 0.8rem;
 	}
 
 	.hero-card {
-		background: linear-gradient(130deg, #ffffff 15%, #f2f8ff 100%);
+		background: linear-gradient(130deg, #f4f9ff 15%, #e8f3ff 100%);
 	}
 
 	.compact-hero {
@@ -512,6 +537,29 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		margin-bottom: 0.15rem;
 	}
 
+	.search-label-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.45rem;
+	}
+
+	.info-bubble {
+		border: none;
+		width: 1.2rem;
+		height: 1.2rem;
+		border-radius: 999px;
+		background: #1f4f77;
+		color: #ffffff;
+		font-size: 0.78rem;
+		font-weight: 700;
+		cursor: pointer;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
 	.actions-row {
 		display: flex;
 		flex-wrap: wrap;
@@ -533,6 +581,44 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	.action-button.tertiary {
 		background: #ddeaf7;
 		color: #1d3f5e;
+	}
+
+	.sources-modal {
+		position: fixed;
+		inset: 0;
+		background: rgba(7, 20, 36, 0.45);
+		display: grid;
+		place-items: center;
+		padding: 1rem;
+		z-index: 2000;
+	}
+
+	.sources-modal[hidden] {
+		display: none;
+	}
+
+	.sources-modal-card {
+		width: min(92vw, 320px);
+		background: #ffffff;
+		border-radius: 14px;
+		padding: 0.9rem;
+		border: 2px solid #b9cddd;
+		display: grid;
+		gap: 0.6rem;
+	}
+
+	.sources-modal-card h2 {
+		font-size: 0.95rem;
+		margin: 0;
+	}
+
+	.sources-list {
+		margin: 0;
+		padding-left: 1rem;
+		display: grid;
+		gap: 0.25rem;
+		font-size: 0.85rem;
+		color: #1d3557;
 	}
 
 	.list-card {
@@ -619,26 +705,11 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	:global(.city-title) {
-		border: none;
-		background: transparent;
 		text-align: left;
-		padding: 0;
 		font-size: 0.9rem;
 		color: #132a42;
 		letter-spacing: 0.2px;
 		font-weight: 700;
-		cursor: pointer;
-	}
-
-	:global(.expand-button) {
-		border: 1px solid #b9cddd;
-		background: #f1f7ff;
-		color: #1f4f77;
-		border-radius: 999px;
-		font-size: 0.69rem;
-		font-weight: 700;
-		padding: 0.2rem 0.5rem;
-		cursor: pointer;
 	}
 
 	:global(.city-details) {
