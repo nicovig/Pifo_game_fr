@@ -64,49 +64,59 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 <Layout pageTitle="PIFO France - Classement des villes">
 	<main class="app">
-		<section class="left-panel">
-			<div class="card hero-card">
-				<h1>PIFO France</h1>
-				<p class="subtitle">Trie les villes, constitue une selection et compare tes choix sur la carte.</p>
-			</div>
+		<h1 class="site-title">PIFO France</h1>
+		<section class="right-panel">
+			<div id="map"></div>
+		</section>
+
+		<section class="filters-panel">
 
 			<div class="card controls-card">
 				<div class="controls-grid">
-					<div class="control-group">
-						<label for="sort-criterion">Critere</label>
-						<select id="sort-criterion">
-							<option value="departmentNumber">Numero de departement</option>
-							<option value="population">Population</option>
-							<option value="latitude">Latitude</option>
-							<option value="longitude">Longitude</option>
-							<option value="birthTimestamp">Date de naissance de la celebrite</option>
-							<option value="rainfallMm">Pluviometrie (mm)</option>
-							<option value="pricePerSquareMeter">Prix au m2 (EUR)</option>
-						</select>
+					<div class="control-group search-group">
+						<label for="search-query">Recherche ville ou departement</label>
+						<input id="search-query" type="text" placeholder="Ex: Nantes, Martinique, 972" />
+					</div>
+
+					<div class="control-inline">
+						<div class="control-group">
+							<label for="sort-criterion">Critere</label>
+							<select id="sort-criterion">
+								<option value="departmentNumber">Departement</option>
+								<option value="population">Population</option>
+								<option value="latitude">Latitude</option>
+								<option value="longitude">Longitude</option>
+								<option value="birthTimestamp">Date celebrite</option>
+								<option value="rainfallMm">Pluviometrie</option>
+								<option value="pricePerSquareMeter">Prix m2</option>
+							</select>
+						</div>
+
+						<div class="control-group">
+							<label for="sort-order">Ordre</label>
+							<select id="sort-order">
+								<option value="desc">Plus au moins</option>
+								<option value="asc">Moins au plus</option>
+							</select>
+						</div>
 					</div>
 
 					<div class="control-group">
-						<label for="sort-order">Ordre</label>
-						<select id="sort-order">
-							<option value="desc">Du plus au moins</option>
-							<option value="asc">Du moins au plus</option>
-						</select>
-					</div>
-
-					<div class="control-group">
-						<label for="scope-mode">Mode d'affichage</label>
+						<label for="scope-mode">Mode</label>
 						<select id="scope-mode">
 							<option value="all">Toutes les villes</option>
-							<option value="selected">Villes selectionnees</option>
+							<option value="selected">Selectionnees</option>
 						</select>
 					</div>
 				</div>
 				<div class="actions-row">
-					<button id="clear-selection" class="action-button tertiary" type="button">Vider la selection</button>
-					<button id="fit-selection" class="action-button" type="button">Cadrer la selection</button>
+					<button id="clear-selection" class="action-button tertiary" type="button">Vider</button>
+					<button id="fit-selection" class="action-button" type="button">Cadrer</button>
 				</div>
 			</div>
+		</section>
 
+		<section class="list-panel">
 			<div class="card list-card">
 				<div class="list-header">
 					<p id="result-count" class="result-count"></p>
@@ -114,22 +124,6 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				</div>
 				<ul id="city-list" class="city-list"></ul>
 			</div>
-		</section>
-
-		<section class="right-panel">
-			<div id="map"></div>
-			<aside class="map-overlay">
-				<div class="card overlay-card compact">
-					<div class="overlay-title-row">
-						<h2>Selection</h2>
-						<div class="legend-inline">
-							<span class="legend-item"><span class="dot dot-default"></span>Normale</span>
-							<span class="legend-item"><span class="dot dot-selected"></span>Selectionnee</span>
-						</div>
-					</div>
-					<p>Clique sur une tuile a gauche ou un marqueur sur la carte pour ajouter/enlever une ville.</p>
-				</div>
-			</aside>
 		</section>
 	</main>
 
@@ -142,6 +136,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		const criterionElement = document.getElementById('sort-criterion');
 		const orderElement = document.getElementById('sort-order');
 		const scopeElement = document.getElementById('scope-mode');
+		const searchElement = document.getElementById('search-query');
 		const cityListElement = document.getElementById('city-list');
 		const resultCountElement = document.getElementById('result-count');
 		const selectionCountElement = document.getElementById('selection-count');
@@ -150,6 +145,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		const cities = JSON.parse(cityDataElement?.textContent ?? '[]');
 		const map = L.map('map', { zoomControl: true, worldCopyJump: true });
 		const selectedCityIds = new Set();
+		const expandedCityIds = new Set();
 
 		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 			maxZoom: 19,
@@ -219,12 +215,39 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 			updateMarkerStyles();
 		};
 
+		const toggleExpanded = (cityId) => {
+			if (expandedCityIds.has(cityId)) {
+				expandedCityIds.delete(cityId);
+			} else {
+				expandedCityIds.add(cityId);
+			}
+		};
+
+		const normalizeText = (value) =>
+			value
+				.toLowerCase()
+				.normalize('NFD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.trim();
+
 		const getCitiesToDisplay = () => {
 			const scope = scopeElement?.value ?? 'all';
-			if (scope === 'selected') {
-				return cities.filter((city) => selectedCityIds.has(city.id));
+			const query = normalizeText(searchElement?.value ?? '');
+			const scopedCities =
+				scope === 'selected' ? cities.filter((city) => selectedCityIds.has(city.id)) : cities;
+			if (!query) {
+				return scopedCities;
 			}
-			return cities;
+			return scopedCities.filter((city) => {
+				const cityName = normalizeText(city.name);
+				const departmentName = normalizeText(city.departmentName);
+				const departmentCode = String(city.departmentNumber);
+				return (
+					cityName.includes(query) ||
+					departmentName.includes(query) ||
+					departmentCode.includes(query)
+				);
+			});
 		};
 
 		const focusSelection = () => {
@@ -239,6 +262,19 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 			if (selectionBounds.isValid()) {
 				map.fitBounds(selectionBounds, { padding: [30, 30] });
 			}
+		};
+
+		const createDetailLine = (labelText, valueText) => {
+			const detailLine = document.createElement('span');
+			detailLine.className = 'detail-line';
+			const label = document.createElement('span');
+			label.className = 'detail-label';
+			label.textContent = labelText;
+			const value = document.createElement('span');
+			value.className = 'detail-value';
+			value.textContent = valueText;
+			detailLine.append(label, value);
+			return detailLine;
 		};
 
 		const render = () => {
@@ -272,30 +308,44 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				if (selectedCityIds.has(city.id)) {
 					item.classList.add('is-selected');
 				}
+				const isExpanded = expandedCityIds.has(city.id);
+				if (isExpanded) {
+					item.classList.add('is-expanded');
+				}
 				item.dataset.cityId = city.id;
 
-				const rank = document.createElement('span');
+				const rank = document.createElement('button');
+				rank.type = 'button';
 				rank.className = 'rank';
 				rank.textContent = String(index + 1);
+				rank.addEventListener('click', (event) => {
+					event.stopPropagation();
+					toggleSelection(city.id);
+					render();
+				});
 
 				const content = document.createElement('div');
 				content.className = 'city-content';
 
-				const title = document.createElement('strong');
+				const topRow = document.createElement('div');
+				topRow.className = 'city-top-row';
+
+				const title = document.createElement('button');
+				title.type = 'button';
+				title.className = 'city-title';
 				title.textContent = city.name;
 
-				const details = document.createElement('span');
-				details.className = 'city-details';
-				details.innerHTML = `
-					<br>
-					<span class="detail-line"><span class="detail-label">Departement </span><span class="detail-value">${city.departmentName} (${city.departmentNumber})</span></span>
-					<br>
-					<span class="detail-line"><span class="detail-label">Population </span><span class="detail-value">${formatNumber(city.population)}</span></span>
-					<br>
-					<span class="detail-line"><span class="detail-label">Pluviometrie </span><span class="detail-value">${city.rainfallMm} mm</span></span>
-					<br>
-					<span class="detail-line"><span class="detail-label">Prix m2 </span><span class="detail-value">${city.pricePerSquareMeter} EUR/m2</span></span>
-				`;
+				const expandButton = document.createElement('button');
+				expandButton.type = 'button';
+				expandButton.className = 'expand-button';
+				expandButton.textContent = isExpanded ? 'Masquer' : 'Details';
+				expandButton.addEventListener('click', (event) => {
+					event.stopPropagation();
+					toggleExpanded(city.id);
+					render();
+				});
+
+				topRow.append(title, expandButton);
 
 				const selectionToggle = document.createElement('button');
 				selectionToggle.type = 'button';
@@ -307,11 +357,29 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 					render();
 				});
 
-				content.append(title, details);
-				item.append(rank, content, selectionToggle);
+				const details = document.createElement('div');
+				details.className = 'city-details';
+				details.append(
+					createDetailLine('Departement', `${city.departmentName} (${city.departmentNumber})`),
+					createDetailLine('Population', formatNumber(city.population)),
+					createDetailLine('Celebrité ', city.celebrity),
+					createDetailLine('Naissance', city.birthDate),
+					createDetailLine('Pluviometrie', `${city.rainfallMm} mm`),
+					createDetailLine('Prix m2', `${city.pricePerSquareMeter} EUR/m2`)				
+				);
+				if (!isExpanded) {
+					details.hidden = true;
+				}
+
+				const actions = document.createElement('div');
+				actions.className = 'city-actions';
+				actions.append(selectionToggle);
+
+				content.append(topRow, details, actions);
+				item.append(rank, content);
 
 				item.addEventListener('click', () => {
-					toggleSelection(city.id);
+					toggleExpanded(city.id);
 					render();
 					const marker = markersById.get(city.id);
 					if (!marker) return;
@@ -328,6 +396,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		criterionElement?.addEventListener('change', render);
 		orderElement?.addEventListener('change', render);
 		scopeElement?.addEventListener('change', render);
+		searchElement?.addEventListener('input', render);
 		clearSelectionButton?.addEventListener('click', () => {
 			selectedCityIds.clear();
 			updateMarkerStyles();
@@ -356,20 +425,27 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	.app {
-		display: grid;
-		grid-template-columns: minmax(360px, 40%) 1fr;
+		display: flex;
+		flex-direction: column;
 		min-height: 100vh;
 		height: auto;
-		gap: 1rem;
-		padding: 1rem;
+		gap: 0.7rem;
+		padding: 0.65rem;
 		box-sizing: border-box;
 	}
 
-	.left-panel {
+	.site-title {
+		margin: 0;
+		font-weight: 700;
+		letter-spacing: 0.2px;
+		color: #1f4f77;
+	}
+
+	.filters-panel {
 		display: flex;
 		flex-direction: column;
 		overflow: visible;
-		gap: 1rem;
+		gap: 0.6rem;
 	}
 
 	.card {
@@ -377,11 +453,15 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		background: #fff;
 		border: 2px solid rgba(31, 79, 119, 0.2);
 		box-shadow: 0 8px 22px rgba(31, 79, 119, 0.12);
-		padding: 1rem 1.1rem;
+		padding: 0.72rem 0.8rem;
 	}
 
 	.hero-card {
 		background: linear-gradient(130deg, #ffffff 15%, #f2f8ff 100%);
+	}
+
+	.compact-hero {
+		padding-block: 0.48rem;
 	}
 
 	h1,
@@ -391,56 +471,63 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	h1 {
-		font-size: 2rem;
-	}
-
-	.subtitle {
-		margin: 0.6rem 0 0;
-		color: #2e4052;
-		font-size: 1rem;
-		line-height: 1.4;
+		font-size: 1.34rem;
 	}
 
 	.controls-grid {
 		display: grid;
 		grid-template-columns: 1fr;
-		gap: 0.85rem;
+		gap: 0.5rem;
 	}
 
 	.control-group {
 		display: grid;
-		gap: 0.4rem;
+		gap: 0.25rem;
+	}
+
+	.control-inline {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.45rem;
 	}
 
 	label {
 		font-weight: 600;
-		font-size: 0.9rem;
+		font-size: 0.76rem;
 		color: var(--pifo-blue);
+		letter-spacing: 0.2px;
 	}
 
+	input,
 	select {
 		border: 1px solid #b9cddd;
-		border-radius: 12px;
-		padding: 0.68rem 0.75rem;
-		font-size: 1rem;
+		border-radius: 10px;
+		padding: 0.46rem 0.52rem;
+		font-size: 0.87rem;
 		background: #fff;
 		color: #102a43;
 	}
 
+	.search-group {
+		margin-bottom: 0.15rem;
+	}
+
 	.actions-row {
 		display: flex;
-		gap: 0.65rem;
-		margin-top: 1rem;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin-top: 0.55rem;
 	}
 
 	.action-button {
 		border: none;
 		border-radius: 10px;
-		padding: 0.58rem 0.8rem;
+		padding: 0.44rem 0.58rem;
 		cursor: pointer;
 		background: var(--pifo-blue);
 		color: #fff;
 		font-weight: 700;
+		font-size: 0.78rem;
 	}
 
 	.action-button.tertiary {
@@ -449,28 +536,25 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	.list-card {
-		display: grid;
-		grid-template-rows: auto 1fr;
-		overflow: hidden;
-		min-height: 0;
+		display: block;
 	}
 
 	.list-header {
 		display: flex;
 		justify-content: space-between;
-		gap: 1rem;
-		margin-bottom: 0.7rem;
+		gap: 0.4rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.result-count {
-		font-size: 0.95rem;
+		font-size: 0.83rem;
 		color: #2e4052;
 		margin: 0;
 		font-weight: 600;
 	}
 
 	.selection-count {
-		font-size: 0.9rem;
+		font-size: 0.8rem;
 		margin: 0;
 		color: var(--pifo-deep);
 		font-weight: 700;
@@ -480,19 +564,18 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		overflow-y: auto;
 		display: grid;
-		gap: 0.7rem;
-		padding-right: 0.25rem;
+		gap: 0.5rem;
+		max-height: none;
 	}
 
 	:global(.city-item) {
 		display: flex;
-		align-items: flex-start;
-		gap: 0.8rem;
+		align-items: stretch;
+		gap: 0.65rem;
 		border: 1px solid rgba(31, 79, 119, 0.2);
 		border-radius: 12px;
-		padding: 0.8rem 0.85rem;
+		padding: 0.62rem 0.68rem;
 		cursor: pointer;
 		background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
 	}
@@ -508,6 +591,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	:global(.rank) {
+		border: none;
 		min-width: 28px;
 		height: 28px;
 		border-radius: 999px;
@@ -518,27 +602,57 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		justify-content: center;
 		font-weight: 700;
 		font-size: 0.85rem;
+		cursor: pointer;
 	}
 
 	:global(.city-content) {
 		display: grid;
-		gap: 0.2rem;
+		gap: 0.35rem;
 		flex: 1;
 	}
 
-	:global(.city-content strong) {
-		font-size: 1.05rem;
+	:global(.city-top-row) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.55rem;
+	}
+
+	:global(.city-title) {
+		border: none;
+		background: transparent;
+		text-align: left;
+		padding: 0;
+		font-size: 0.9rem;
 		color: #132a42;
 		letter-spacing: 0.2px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	:global(.expand-button) {
+		border: 1px solid #b9cddd;
+		background: #f1f7ff;
+		color: #1f4f77;
+		border-radius: 999px;
+		font-size: 0.69rem;
+		font-weight: 700;
+		padding: 0.2rem 0.5rem;
+		cursor: pointer;
 	}
 
 	:global(.city-details) {
 		color: #334e68;
-		font-size: 0.9rem;
+		font-size: 0.82rem;
 		line-height: 1.3;
 		display: grid;
 		gap: 0.26rem;
 		margin-top: 0.15rem;
+	}
+
+	:global(.city-actions) {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	:global(.detail-line) {
@@ -554,7 +668,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		color: #1f4f77;
 		border-radius: 999px;
 		padding: 0.12rem 0.45rem;
-		font-size: 0.72rem;
+		font-size: 0.66rem;
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.3px;
@@ -570,8 +684,8 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		border-radius: 8px;
 		background: #e6f2ff;
 		color: var(--pifo-blue);
-		padding: 0.45rem 0.65rem;
-		font-size: 0.8rem;
+		padding: 0.34rem 0.5rem;
+		font-size: 0.72rem;
 		font-weight: 700;
 		cursor: pointer;
 	}
@@ -582,12 +696,14 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 	}
 
 	.right-panel {
-		min-height: 100vh;
+		min-height: 39vh;
+		height: 39vh;
 		position: relative;
 		overflow: hidden;
 		border-radius: 18px;
 		border: 2px solid rgba(31, 79, 119, 0.22);
 		box-shadow: 0 8px 22px rgba(31, 79, 119, 0.12);
+		flex-shrink: 0;
 	}
 
 	#map {
@@ -597,22 +713,23 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	.map-overlay {
 		position: absolute;
-		top: 1rem;
-		right: 1rem;
+		top: 0.45rem;
+		left: 0.55rem;
+		right: 0.55rem;
 		display: grid;
 		gap: 0.5rem;
-		max-width: min(340px, 90%);
+		max-width: none;
 		z-index: 500;
 	}
 
 	.overlay-card {
-		padding: 0.75rem 0.85rem;
+		padding: 0.52rem 0.62rem;
 		background: rgba(255, 255, 255, 0.93);
 		backdrop-filter: blur(5px);
 	}
 
 	.overlay-card h2 {
-		font-size: 1rem;
+		font-size: 0.9rem;
 		margin-bottom: 0.2rem;
 	}
 
@@ -636,7 +753,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	.overlay-card p {
 		margin: 0;
-		font-size: 0.82rem;
+		font-size: 0.72rem;
 		color: #2f4858;
 		line-height: 1.3;
 	}
@@ -645,7 +762,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		display: flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-size: 0.78rem;
+		font-size: 0.68rem;
 		color: #102a43;
 	}
 
@@ -664,20 +781,11 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 		background: var(--pifo-red);
 	}
 
-	@media (max-width: 1080px) {
-		.app {
-			grid-template-columns: 1fr;
-			grid-template-rows: 56vh 44vh;
-			height: auto;
-		}
+	:global(.leaflet-container) {
+		border-radius: 14px;
+	}
 
-		.left-panel {
-			min-height: 0;
-		}
-
-		.right-panel {
-			min-height: 0;
-			height: 64vh;
-		}
+	:global(.leaflet-bottom) {
+		bottom: 0;
 	}
 </style>
