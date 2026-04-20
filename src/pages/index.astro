@@ -87,13 +87,13 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						<div class="control-group">
 							<label for="sort-criterion">Critere</label>
 							<select id="sort-criterion">
-								<option value="name">Alphabetique</option>
+								<option value="name">Alphabétique</option>
 								<option value="departmentNumber" selected>Departement</option>
 								<option value="population">Population</option>
 								<option value="latitude">Latitude</option>
 								<option value="longitude">Longitude</option>
-								<option value="birthTimestamp">Date celebrite</option>
-								<option value="rainfallMm">Pluviometrie</option>
+								<option value="birthTimestamp">Naissance célébrité</option>
+								<option value="rainfallMm">Pluviométrie</option>
 								<option value="pricePerSquareMeter">Prix m2</option>
 							</select>
 						</div>
@@ -360,11 +360,11 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				const details = document.createElement('div');
 				details.className = 'city-details';
 				details.append(
-					createDetailLine('Departement', `${city.departmentName} (${city.departmentNumber})`),
+					createDetailLine('Département', `${city.departmentName} (${city.departmentNumber})`),
 					createDetailLine('Population', formatNumber(city.population)),
-					createDetailLine('Celebrité ', city.celebrity),
+					createDetailLine('Célébrité ', city.celebrity),
 					createDetailLine('Naissance', city.birthDate),
-					createDetailLine('Pluviometrie', `${city.rainfallMm} mm`),
+					createDetailLine('Pluviométrie', `${city.rainfallMm} mm`),
 					createDetailLine('Prix m2', `${city.pricePerSquareMeter} EUR/m2`)				
 				);
 
