@@ -111,7 +111,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						<label for="scope-mode">Villes a afficher</label>
 						<select id="scope-mode">
 							<option value="all">Toutes les villes</option>
-							<option value="selected">Selectionnees</option>
+							<option value="selected">Sélectionnées</option>
 						</select>
 					</div>
 				</div>
@@ -308,10 +308,10 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 			});
 
 			if (resultCountElement) {
-				resultCountElement.textContent = `${sortedCities.length} villes affichees`;
+				resultCountElement.textContent = `${sortedCities.length} villes affichées`;
 			}
 			if (selectionCountElement) {
-				selectionCountElement.textContent = `${selectedCityIds.size} villes selectionnees`;
+				selectionCountElement.textContent = `${selectedCityIds.size} villes sélectionnées`;
 			}
 
 			if (!cityListElement) return;
