@@ -75,7 +75,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				<div class="controls-grid">
 					<div class="control-group search-group">
 						<div class="search-label-row">
-							<label for="search-query">Recherche ville ou département</label>
+							<label for="search-query">Rechercher la ville ou le département</label>
 							<button id="sources-info-button" class="info-bubble" type="button" aria-label="Afficher les sources">
 								i
 							</button>
@@ -111,7 +111,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						<label for="scope-mode">Villes à afficher</label>
 						<select id="scope-mode">
 							<option value="all">Toutes les villes</option>
-							<option value="selected">villes sélectionnées</option>
+							<option value="selected">Villes sélectionnées</option>
 						</select>
 					</div>
 				</div>
@@ -141,6 +141,9 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 					<p id="selection-count" class="selection-count"></p>
 				</div>
 				<ul id="city-list" class="city-list"></ul>
+				<p class="list-disclaimer">
+					Application indépendante, non affiliée à Génépi Éditions.
+				</p>
 			</div>
 		</section>
 	</main>
@@ -350,7 +353,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 				const selectionToggle = document.createElement('button');
 				selectionToggle.type = 'button';
 				selectionToggle.className = 'select-button';
-				selectionToggle.textContent = selectedCityIds.has(city.id) ? 'Retirer' : 'Selectionner';
+				selectionToggle.textContent = selectedCityIds.has(city.id) ? 'Retirer' : 'Sélectionner';
 				selectionToggle.addEventListener('click', (event) => {
 					event.stopPropagation();
 					toggleSelection(city.id);
@@ -623,6 +626,15 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 	.list-card {
 		display: block;
+	}
+
+	.list-disclaimer {
+		margin: 0.75rem 0 0;
+		font-size: 0.68rem;
+		font-style: italic;
+		color: #64748b;
+		text-align: center;
+		line-height: 1.35;
 	}
 
 	.list-header {
