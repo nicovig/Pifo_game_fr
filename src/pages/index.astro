@@ -85,7 +85,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 
 					<div class="control-inline">
 						<div class="control-group">
-							<label for="sort-criterion">Critere</label>
+							<label for="sort-criterion">Critère de tri</label>
 							<select id="sort-criterion">
 								<option value="name">Alphabétique</option>
 								<option value="departmentNumber" selected>Département</option>
@@ -99,7 +99,7 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 						</div>
 
 						<div class="control-group">
-							<label for="sort-order">Ordre</label>
+							<label for="sort-order">Trier du</label>
 							<select id="sort-order">
 								<option value="asc" selected>Moins au plus</option>
 								<option value="desc">Plus au moins</option>
@@ -108,10 +108,10 @@ const cities: City[] = (rawCities as CityRaw[]).map((city) => ({
 					</div>
 
 					<div class="control-group">
-						<label for="scope-mode">Villes a afficher</label>
+						<label for="scope-mode">Villes à afficher</label>
 						<select id="scope-mode">
 							<option value="all">Toutes les villes</option>
-							<option value="selected">Sélectionnées</option>
+							<option value="selected">villes sélectionnées</option>
 						</select>
 					</div>
 				</div>
